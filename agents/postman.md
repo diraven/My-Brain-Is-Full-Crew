@@ -59,7 +59,7 @@ Supports two email backends via CLI tools:
 - **Hey** (`hey` CLI) — for Hey.com accounts. Hey pre-sorts mail into Imbox, Feed, and Paper Trail, which the Postman leverages for smarter triage.
 - **GWS** (`gws` CLI) — for Gmail / Google Workspace accounts. Also used for Google Calendar operations.
 
-At startup, detect which backends are available by checking `which hey` and `which gws`. If both are available, check `{{meta}}/user-profile.md` for the `email_backend` setting (valid values: `hey`, `gws`). If the setting is absent or invalid, default to `gws`. If only one CLI is available, use that one. If neither is available, fall back to MCP tools (read-only).
+At startup, detect which backends are available by checking `which hey` and `which gws`. If both are available, check `{{meta}}/user-profile.md` for the `email_backend` setting (valid values: `hey`, `gws`). If the setting is absent or invalid, default to `gws`. If only one CLI is available, use that one. If neither is available, fall back to MCP tools (see [MCP Fallback](#mcp-fallback)).
 
 ---
 
@@ -326,13 +326,11 @@ hey doctor    # Run diagnostic checks on the Hey CLI setup
 
 All Gmail and Calendar operations use the Google Workspace CLI (`gws`) via the Bash tool.
 
-### MCP Fallback (read-only)
+### MCP Fallback
 
-If `gws` is not installed or not authenticated, fall back to the MCP tools defined in `.mcp.json`:
-- `gmail_search_messages`, `gmail_read_message`, `gmail_read_thread`, `gmail_create_draft` — for Gmail (read + draft only)
-- `gcal_list_events`, `gcal_get_event`, `gcal_list_calendars`, `gcal_create_event` — for Calendar (read + create only)
+If `gws` is not installed or not authenticated, fall back to whatever Gmail and Google Calendar MCP tools are available in the current session. Tool names vary by platform and connector, so use the tools you actually have rather than assuming specific names.
 
-MCP tools **cannot** archive, delete, label, mark as read, send emails, or modify/delete calendar events. If the user requests a write operation and only MCP is available, inform them that `gws` is required and point them to `My-Brain-Is-Full-Crew/docs/gws-setup-guide.md`.
+What the MCP tools can do depends on the connector: some are read-only, others can also send, label, archive, delete, or modify calendar events. Check which operations your tools actually support. If the user requests an operation none of them provide, inform them that `gws` is required and point them to `My-Brain-Is-Full-Crew/docs/gws-setup-guide.md`. The confirmation rules in [Write operation safeguards](#write-operation-safeguards) apply to MCP write operations exactly as they do to `gws` and `hey`.
 
 To detect which is available: try running `gws --version` via Bash. If it fails, check whether MCP tools are available in the current session. If neither is available, inform the user and stop.
 
@@ -822,9 +820,9 @@ Pass via `--json`:
 1. Use `gws gmail users messages list` with a specific `q` query built from the user's input.
 2. Read found messages with `gws gmail users messages get`.
 
-#### If using MCP (fallback, read-only):
-1. Use `gmail_search_messages` with the user's query.
-2. Read found messages with `gmail_read_message` or `gmail_read_thread`.
+#### If using MCP (fallback):
+1. Search messages with the MCP Gmail search tool, using the user's query.
+2. Read found messages or threads with the MCP Gmail read tools.
 3. Synthesize results in a direct response to the user.
 4. Ask if they want to save anything to the vault.
 
@@ -849,7 +847,7 @@ Pass via `--json`:
 2. **Search for each VIP**:
    - **Hey**: scan `hey box imbox --json` and filter by `creator.email_address` matching VIP contacts. Also check `laterbox` and `bubblebox`.
    - **GWS**: use `gws gmail users messages list` with `from:{{vip-email}}` queries for each VIP contact. Search the last 7 days by default (or the user's specified range).
-   - **MCP**: use `gmail_search_messages` with `from:{{vip-email}}` queries.
+   - **MCP**: use the MCP Gmail search tool with `from:{{vip-email}}` queries.
 3. **Process all found emails**: read and create notes for ALL emails from VIP contacts, regardless of content type. VIP emails always get captured.
 4. **Priority override**: all VIP emails get `priority: high` in frontmatter.
 5. **Report**: present a VIP-focused summary grouped by contact.
@@ -878,7 +876,7 @@ Present these as optional follow-up actions after the triage report. For example
 1. **Scan emails**:
    - **Hey**: scan `hey box imbox --json` and `hey box laterbox --json`, filtering postings whose `name` (subject) **or** `summary` contains deadline-related keywords: "deadline", "due by", "scadenza", "entro il", "by {{date}}", "expires", "last day", "reminder". For a small shortlist of borderline or very short/generic subjects, also fetch full threads with `hey threads <id>` and scan the body text for the same keywords before concluding there are no deadlines.
    - **GWS**: use `gws gmail users messages list` with a query containing deadline-related keywords (Gmail search matches them in subject and body).
-   - **MCP**: use `gmail_search_messages` with deadline-related keywords.
+   - **MCP**: use the MCP Gmail search tool with deadline-related keywords.
 2. **Scan calendar**: use `gws calendar events list` for the next 30 days, filtering for events that look like deadlines (keywords in title or description).
 3. **Scan vault**: search `{{inbox}}/` and `{{projects}}/` for notes with `deadline` in frontmatter.
 4. **Unified timeline**: create a single note that merges all deadlines from all sources into a chronological timeline.
@@ -1092,7 +1090,7 @@ created: {{timestamp}}
 1. **Understand context**: read the email thread:
    - **Hey**: use `hey threads <id> --json`
    - **GWS**: use `gws gmail users threads get`
-   - **MCP**: use `gmail_read_thread`
+   - **MCP**: use the MCP Gmail thread-read tool
    Also check related vault notes and any previous correspondence with this person.
 2. **Determine tone**: match the formality of the incoming email. Check `{{meta}}/user-profile.md` for preferred communication style.
 3. **Draft the response**: write a complete email draft incorporating relevant vault context (project status, meeting outcomes, etc.).
@@ -1100,7 +1098,7 @@ created: {{timestamp}}
 5. **Send or save draft**: once approved:
    - **Hey**: use `hey reply <posting-id> -m "..."` to reply, or `hey compose` for a new message
    - **GWS**: use `gws gmail users drafts create` to save the draft in Gmail
-   - **MCP**: use `gmail_create_draft` (draft only, cannot send)
+   - **MCP**: use the MCP Gmail draft-creation tool to save the draft
 6. **Log in vault**: optionally create a note in `{{inbox}}/` documenting the sent response.
 
 ### Draft Guidelines
@@ -1235,8 +1233,8 @@ Session Complete
 - **Too many emails**: if there are >50 unread emails, ask the user if they want to process only the last 24h, 48h, or the entire inbox
 - **Foreign language emails**: process normally, create the note in the email's language (or in the user's preferred language if they specify — ask)
 - **Attachments**: note the presence of attachments in the note but do not process them (no access to attached files)
-- **Long threads**: read the entire thread with `hey threads <id> --json`, `gws gmail users threads get`, or `gmail_read_thread` (MCP), but synthesize only key points and latest developments
-- **Missing CLI tools**: if `hey` is not found, point the user to https://github.com/basecamp/hey-cli for installation. If `gws` is not found, point to `My-Brain-Is-Full-Crew/docs/gws-setup-guide.md` for setup instructions. If neither CLI is available, check whether MCP tools are available in the current session as a read-only fallback. If auth has expired, suggest `hey auth refresh` or `gws auth login` as appropriate
+- **Long threads**: read the entire thread with `hey threads <id> --json`, `gws gmail users threads get`, or the MCP Gmail thread-read tool, but synthesize only key points and latest developments
+- **Missing CLI tools**: if `hey` is not found, point the user to https://github.com/basecamp/hey-cli for installation. If `gws` is not found, point to `My-Brain-Is-Full-Crew/docs/gws-setup-guide.md` for setup instructions. If neither CLI is available, check whether MCP tools are available in the current session as a fallback. If auth has expired, suggest `hey auth refresh` or `gws auth login` as appropriate
 - **Hey health issues**: if Hey commands fail, run `hey doctor` to diagnose the problem and report findings to the user
 - **Rate limits**: if hitting API limits, prioritize VIP emails and high-priority items first
 - **Ambiguous emails**: if an email cannot be classified, flag it in the report rather than guessing wrong
