@@ -77,7 +77,7 @@ The build system translates `capabilities` into platform-specific tool lists or 
 |-------|----------|-------------|
 | `name` | Yes | Lowercase, hyphens only (e.g., `my-agent`) |
 | `description` | Yes | When the platform should auto-invoke this agent. Include multilingual triggers |
-| `capabilities` | Yes | List from: `read`, `write`, `edit`, `bash`, `webfetch`, `websearch`, `task`, `todo` |
+| `capabilities` | Yes | List from: `read`, `write`, `edit`, `bash`, `webfetch`, `websearch`, `task`, `todo`, `mcp` (Claude Code only for now: the agent inherits the session's MCP tools) |
 | `model` | No | `low`, `mid`, or `high` (default: inherits from parent) |
 | `exclude` | No | List of platforms to exclude this agent from (e.g., `[opencode]`) |
 

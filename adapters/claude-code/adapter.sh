@@ -25,6 +25,7 @@ cc_capability_to_tools() {
     notebook)  echo "NotebookEdit" ;;
     task)      echo "Task" ;;
     todo)      echo "TodoWrite" ;;
+    mcp)       echo "" ;;  # handled in adapter_translate_agents (inherit mode)
     *)         echo "" ;;
   esac
 }
@@ -245,13 +246,36 @@ adapter_translate_agents() {
       fi
     done
 
+    # `mcp` capability: MCP server names differ per setup (claude.ai
+    # connectors, local servers, ...), so an explicit allowlist cannot name
+    # them. Omit `tools:` so the subagent inherits the session's tools,
+    # including MCP, and use `disallowedTools:` to remove the built-in tools
+    # of every capability the agent did not declare.
+    local tools_line="tools: $tools"
+    if [[ " $caps " == *" mcp "* ]]; then
+      local denied=""
+      for vcap in $CAPABILITY_VOCAB; do
+        [[ " $caps " == *" $vcap "* ]] && continue
+        local vtools; vtools="$(cc_capability_to_tools "$vcap")"
+        [[ "$vcap" == "read" ]] && vtools="$vtools Glob Grep"
+        for tool in $vtools; do
+          denied="${denied:+$denied, }$tool"
+        done
+      done
+      if [[ -n "$denied" ]]; then
+        tools_line="disallowedTools: $denied"
+      else
+        tools_line=""
+      fi
+    fi
+
     local out_file="$out_dir/$(basename "$agent")"
     {
       echo "---"
       echo "name: $name"
       # Copy description block (may be folded YAML with continuation lines)
       awk '{ sub(/\r$/, "") } /^---$/{n++; next} n==1 && /^description:/{print; in_desc=1; next} n==1 && in_desc && /^[[:space:]]/{print; next} n==1 && in_desc && !/^[[:space:]]/{in_desc=0} n>=2{exit}' "$agent"
-      echo "tools: $tools"
+      [[ -n "$tools_line" ]] && echo "$tools_line"
       echo "model: $model"
       echo "---"
       agent_body "$agent"

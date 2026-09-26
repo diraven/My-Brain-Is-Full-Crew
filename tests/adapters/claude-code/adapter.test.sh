@@ -140,6 +140,28 @@ EOF
   return 0
 }
 
+test_translate_agents_mcp_capability_inherits_tools() {
+  local src; src="$(mktemp -d)"
+  local dst; dst="$(mktemp -d)"
+  mkdir -p "$src/agents"
+  cat > "$src/agents/postman.md" <<'EOF'
+---
+name: postman
+description: Test
+model: mid
+capabilities: [read, write, edit, bash, mcp]
+---
+
+body
+EOF
+  adapter_translate_agents "$src/agents" "$dst"
+  local out="$dst/.claude/agents/postman.md" result=0
+  grep -q "^tools:" "$out" && { echo "tools: allowlist should be omitted for mcp agents"; result=1; }
+  grep -q "^disallowedTools: WebFetch, WebSearch, NotebookEdit, Task, TodoWrite$" "$out" || { echo "disallowedTools incorrect: $(grep '^disallowedTools:' "$out")"; result=1; }
+  rm -rf "$src" "$dst"
+  return $result
+}
+
 test_translate_skills_copies_skill_md() {
   local src; src="$(mktemp -d)"
   local dst; dst="$(mktemp -d)"
