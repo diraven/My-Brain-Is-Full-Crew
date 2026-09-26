@@ -10,7 +10,9 @@
 # ── Vocabulary constants ─────────────────────────────────────────────────────
 # The closed set of capabilities the source frontmatter may declare.
 # Adapters consult this list to validate frontmatter before translating.
-CAPABILITY_VOCAB="read write edit bash webfetch websearch notebook task todo"
+# `mcp` grants access to the MCP tools available in the session. Adapters that
+# cannot express it treat it as a no-op.
+CAPABILITY_VOCAB="read write edit bash webfetch websearch notebook task todo mcp"
 
 # The closed set of hook event names the source .hook.yaml may declare.
 EVENT_VOCAB="before-tool-use after-tool-use on-notification on-session-start on-prompt-submit"

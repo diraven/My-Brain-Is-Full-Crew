@@ -26,7 +26,7 @@ description: >
   "criar evento", "o que tem no calendário", "triagem de email",
   "preparar a reunião", "agenda semanal", "rascunho de resposta".
 mode: subagent
-capabilities: [read, write, edit, bash]
+capabilities: [read, write, edit, bash, mcp]
 model: mid
 ---
 
